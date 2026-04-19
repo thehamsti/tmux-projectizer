@@ -1,0 +1,121 @@
+# tmux-projectizer
+
+`tmux-projectizer` is a reusable tmux plugin that turns a set of project roots into quick session workflows. It picks a project directory, creates a predictable multi-window tmux session for it, and lets you jump back to any existing session with a fast picker.
+
+It is extracted from a custom local tmux setup, generalized into TPM conventions, and packaged so it is ready to publish and install from GitHub.
+
+## Features
+
+- Scans one or more project roots for candidate directories.
+- Creates project sessions on demand, or switches to an existing matching session.
+- Builds a repeatable first-window layout plus additional named windows.
+- Uses `fzf` inside a tmux popup when available.
+- Falls back cleanly when popups or `fzf` are unavailable.
+- Reads all behavior from tmux options, so it is easy to customize per machine.
+
+## Requirements
+
+- tmux 3.2+ for popup support.
+- `fzf` is recommended for the project picker and session switcher.
+- Without tmux popup support, `new-project-session` falls back to `command-prompt` and `switch-session` falls back to `choose-tree`.
+
+## Installation
+
+### TPM
+
+Add the plugin to your `~/.tmux.conf`:
+
+```tmux
+set -g @plugin 'thehamsti/tmux-projectizer'
+```
+
+Then reload tmux and install with TPM:
+
+```tmux
+prefix + I
+```
+
+### Manual installation
+
+Clone the repo somewhere tmux can read it:
+
+```bash
+git clone https://github.com/thehamsti/tmux-projectizer.git ~/.tmux/plugins/tmux-projectizer
+```
+
+Source the plugin from `~/.tmux.conf`:
+
+```tmux
+run-shell ~/.tmux/plugins/tmux-projectizer/tmux-projectizer.tmux
+```
+
+Reload tmux:
+
+```tmux
+tmux source-file ~/.tmux.conf
+```
+
+## Usage
+
+- `@projectizer-new-session-key` opens the project picker and creates or reuses a session for the selected directory.
+- `@projectizer-switch-session-key` opens the session picker and switches to an existing tmux session.
+
+With the default bindings:
+
+- `prefix + S` opens the project picker.
+- `prefix + f` opens the session switcher.
+
+When a new session is created:
+
+1. The session name is derived from the selected directory basename and sanitized for tmux.
+2. The first window is created with the configured split layout.
+3. Extra windows are created from `@projectizer-windows`.
+4. The configured initial window is selected.
+
+## Configuration
+
+All options use tmux global options and can be set in `~/.tmux.conf`.
+
+| Option | Default | Description |
+| --- | --- | --- |
+| `@projectizer-paths` | `"$HOME/projects"` | Space-separated list of directories to search for projects |
+| `@projectizer-search-depth` | `2` | Max depth for `find` when scanning project directories |
+| `@projectizer-new-session-key` | `S` | Key binding for new project session picker |
+| `@projectizer-switch-session-key` | `f` | Key binding for session switcher |
+| `@projectizer-layout` | `"main-vertical"` | Layout for new sessions (`main-vertical`, `even-horizontal`, and other tmux layouts) |
+| `@projectizer-main-pane-width` | `"66%"` | Main pane width for `main-*` layouts |
+| `@projectizer-windows` | `"main bg logs"` | Space-separated window names to create |
+| `@projectizer-initial-window` | `1` | 1-based ordinal of the created window to select after creation |
+| `@projectizer-fzf-height` | `"40%"` | Height for the `fzf` popup |
+| `@projectizer-popup` | `"auto"` | `"auto"` uses popup when available, `"always"` requires popup, `"never"` disables popup fallbacks |
+
+Example configuration:
+
+```tmux
+set -g @projectizer-paths "$HOME/projects $HOME/k16"
+set -g @projectizer-search-depth 3
+set -g @projectizer-layout "main-vertical"
+set -g @projectizer-main-pane-width "70%"
+set -g @projectizer-windows "main editor logs scratch"
+set -g @projectizer-initial-window 2
+set -g @projectizer-new-session-key "S"
+set -g @projectizer-switch-session-key "f"
+```
+
+## How the picker behaves
+
+- `new-project-session` uses popup + `fzf` when tmux and `fzf` support it.
+- If popup support is unavailable, it falls back to `command-prompt` so you can type a directory path manually.
+- `switch-session` uses popup + `fzf` when possible, otherwise it falls back to tmux `choose-tree`.
+- Canceling either picker exits cleanly without disrupting the current client.
+
+## Similar plugins
+
+- [`tmux-sessionist`](https://github.com/tmux-plugins/tmux-sessionist) for quick session and window shortcuts.
+- [`tmuxinator`](https://github.com/tmuxinator/tmuxinator) for declarative project session bootstrapping.
+
+`tmux-projectizer` sits between those tools: lighter-weight than a full project orchestrator, but more opinionated than a bare session switcher.
+
+## License
+
+Released under the MIT License. See [`LICENSE`](./LICENSE).
