@@ -67,6 +67,33 @@ test_sanitize_session_name() {
   assert_eq "$result" "hello-world-now" "sanitize_session_name normalizes mixed characters"
 }
 
+test_new_project_session_uses_project_config_windows() {
+  local stub_dir log_file project_dir
+
+  stub_dir="$(new_stub_dir)"
+  prepare_path "$stub_dir"
+  log_file="${stub_dir}/commands.log"
+  project_dir="$TEST_ROOT/configured-project"
+  mkdir -p "$project_dir"
+  cat >"$project_dir/.tmux-projectizer.yml" <<'EOF'
+# Project-local overrides
+windows:
+  - name: editor
+  - name: server
+  - name: tests
+initial_window: 2
+EOF
+
+  PROJECTIZER_WINDOWS="main bg logs" \
+    PROJECTIZER_INITIAL_WINDOW="1" \
+    bash "$REPO_ROOT/scripts/new-project-session.sh" --dir "$project_dir"
+
+  assert_contains "$log_file" "new-session -d -s configured-project -c $project_dir -n editor" "project config overrides the first window name"
+  assert_contains "$log_file" "new-window -t configured-project -n server -c $project_dir" "project config creates the second configured window"
+  assert_contains "$log_file" "new-window -t configured-project -n tests -c $project_dir" "project config creates the third configured window"
+  assert_contains "$log_file" "select-window -t configured-project:2" "project config can override the initial window"
+}
+
 test_new_project_session_reuses_existing_session() {
   local stub_dir log_file project_dir
 
@@ -109,6 +136,45 @@ test_new_project_session_creates_windows_and_layout() {
   assert_contains "$log_file" "select-window -t my-app:3" "configured initial window is selected by ordinal"
 }
 
+test_new_project_session_without_project_config_uses_defaults() {
+  local stub_dir log_file project_dir
+
+  stub_dir="$(new_stub_dir)"
+  prepare_path "$stub_dir"
+  log_file="${stub_dir}/commands.log"
+  project_dir="$TEST_ROOT/default-project"
+  mkdir -p "$project_dir"
+
+  PROJECTIZER_WINDOWS="main bg logs" \
+    PROJECTIZER_INITIAL_WINDOW="1" \
+    bash "$REPO_ROOT/scripts/new-project-session.sh" --dir "$project_dir"
+
+  assert_contains "$log_file" "new-session -d -s default-project -c $project_dir -n main" "defaults create the first window when no project config exists"
+  assert_contains "$log_file" "new-window -t default-project -n bg -c $project_dir" "defaults create the second window when no project config exists"
+  assert_contains "$log_file" "new-window -t default-project -n logs -c $project_dir" "defaults create the third window when no project config exists"
+}
+
+test_new_project_session_project_config_overrides_layout_and_width() {
+  local stub_dir log_file project_dir
+
+  stub_dir="$(new_stub_dir)"
+  prepare_path "$stub_dir"
+  log_file="${stub_dir}/commands.log"
+  project_dir="$TEST_ROOT/layout-project"
+  mkdir -p "$project_dir"
+  cat >"$project_dir/.tmux-projectizer.yml" <<'EOF'
+layout: main-horizontal
+main_pane_width: 70%
+EOF
+
+  PROJECTIZER_LAYOUT="even-horizontal" \
+    PROJECTIZER_MAIN_PANE_WIDTH="55%" \
+    bash "$REPO_ROOT/scripts/new-project-session.sh" --dir "$project_dir"
+
+  assert_contains "$log_file" "set-window-option -t layout-project:1 main-pane-width 70%" "project config overrides the main pane width"
+  assert_contains "$log_file" "select-layout -t layout-project:1 main-horizontal" "project config overrides the layout"
+}
+
 test_switch_session_uses_choose_tree_without_popup() {
   local stub_dir log_file
 
@@ -139,8 +205,11 @@ test_switch_session_uses_popup_and_switches() {
 }
 
 run_test "sanitize session name" test_sanitize_session_name
+run_test "project config windows" test_new_project_session_uses_project_config_windows
 run_test "reuse existing session" test_new_project_session_reuses_existing_session
 run_test "create session layout and windows" test_new_project_session_creates_windows_and_layout
+run_test "project config fallback defaults" test_new_project_session_without_project_config_uses_defaults
+run_test "project config layout override" test_new_project_session_project_config_overrides_layout_and_width
 run_test "switch-session fallback" test_switch_session_uses_choose_tree_without_popup
 run_test "switch-session popup flow" test_switch_session_uses_popup_and_switches
 

@@ -209,6 +209,33 @@ if [[ ! -d "$project_dir" ]]; then
   exit 1
 fi
 
+while IFS= read -r config_line; do
+  [[ -n "$config_line" ]] || continue
+
+  case "${config_line%%=*}" in
+    PROJECTIZER_WINDOWS)
+      PROJECTIZER_WINDOWS="${config_line#*=}"
+      ;;
+    PROJECTIZER_LAYOUT)
+      PROJECTIZER_LAYOUT="${config_line#*=}"
+      ;;
+    PROJECTIZER_MAIN_PANE_WIDTH)
+      PROJECTIZER_MAIN_PANE_WIDTH="${config_line#*=}"
+      ;;
+    PROJECTIZER_INITIAL_WINDOW)
+      PROJECTIZER_INITIAL_WINDOW="${config_line#*=}"
+      ;;
+    PROJECTIZER_SEARCH_DEPTH)
+      PROJECTIZER_SEARCH_DEPTH="${config_line#*=}"
+      ;;
+  esac
+done < <(load_project_config "$project_dir")
+
+PROJECTIZER_SEARCH_DEPTH="${PROJECTIZER_SEARCH_DEPTH//[^0-9]/}"
+if [[ -z "$PROJECTIZER_SEARCH_DEPTH" ]]; then
+  PROJECTIZER_SEARCH_DEPTH="2"
+fi
+
 session_name="$(sanitize_session_name "$(basename "$project_dir")")"
 if tmux has-session -t "$session_name" 2>/dev/null; then
   tmux switch-client -t "$session_name"

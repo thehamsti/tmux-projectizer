@@ -102,6 +102,56 @@ set -g @projectizer-new-session-key "S"
 set -g @projectizer-switch-session-key "f"
 ```
 
+## Per-Project Configuration
+
+If a selected project directory contains a `.tmux-projectizer.yml` file, the plugin reads it before creating the tmux session and uses those values as project-local overrides.
+
+Precedence order:
+
+1. Global tmux options like `@projectizer-windows`
+2. Environment variables passed by the plugin entry point
+3. `.tmux-projectizer.yml` in the selected project directory
+
+Supported YAML keys:
+
+| YAML key | Overrides |
+| --- | --- |
+| `windows` | `@projectizer-windows` |
+| `layout` | `@projectizer-layout` |
+| `main_pane_width` | `@projectizer-main-pane-width` |
+| `initial_window` | `@projectizer-initial-window` |
+| `search_depth` | `@projectizer-search-depth` |
+
+The parser is intentionally simple and dependency-free. Use a flat structure with scalar values and a `windows` list made of consecutive `- name: ...` entries.
+
+Example:
+
+```yaml
+windows:
+  - name: editor
+  - name: server
+  - name: logs
+layout: main-vertical
+main_pane_width: 70%
+initial_window: 2
+```
+
+For example, a Next.js app might keep its project-local workflow alongside the code:
+
+```yaml
+# my-next-app/.tmux-projectizer.yml
+windows:
+  - name: editor
+  - name: dev
+  - name: logs
+  - name: tests
+layout: main-vertical
+main_pane_width: 72%
+initial_window: 2
+```
+
+With that file in place, selecting `my-next-app` creates an `editor` workspace window, then dedicated `dev`, `logs`, and `tests` windows, regardless of the global defaults configured in your tmux config.
+
 ## How the picker behaves
 
 - `new-project-session` uses popup + `fzf` when tmux and `fzf` support it.
