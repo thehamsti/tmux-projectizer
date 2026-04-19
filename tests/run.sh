@@ -94,6 +94,59 @@ EOF
   assert_contains "$log_file" "select-window -t configured-project:2" "project config can override the initial window"
 }
 
+test_new_project_session_runs_project_window_commands() {
+  local stub_dir log_file project_dir
+
+  stub_dir="$(new_stub_dir)"
+  prepare_path "$stub_dir"
+  log_file="${stub_dir}/commands.log"
+  project_dir="$TEST_ROOT/commands-project"
+  mkdir -p "$project_dir"
+  cat >"$project_dir/.tmux-projectizer.yml" <<'EOF'
+windows:
+  - name: editor
+  - name: dev
+    command: npm run dev
+  - name: logs
+    command: docker compose logs -f
+  - name: tests
+EOF
+
+  PROJECTIZER_WINDOWS="main bg logs" \
+    bash "$REPO_ROOT/scripts/new-project-session.sh" --dir "$project_dir"
+
+  assert_contains "$log_file" "send-keys -t commands-project:2.1 npm run dev Enter" "startup command runs in the configured dev window"
+  assert_contains "$log_file" "send-keys -t commands-project:3.1 docker compose logs -f Enter" "startup command runs in the configured logs window"
+
+  if grep -Fq "send-keys -t commands-project:1.1" "$log_file" ||
+    grep -Fq "send-keys -t commands-project:4.1" "$log_file"; then
+    printf 'FAIL: plain windows should not receive startup commands\n' >&2
+    printf 'Log contents:\n' >&2
+    cat "$log_file" >&2
+    exit 1
+  fi
+}
+
+test_new_project_session_global_windows_do_not_run_commands() {
+  local stub_dir log_file project_dir
+
+  stub_dir="$(new_stub_dir)"
+  prepare_path "$stub_dir"
+  log_file="${stub_dir}/commands.log"
+  project_dir="$TEST_ROOT/global-only-project"
+  mkdir -p "$project_dir"
+
+  PROJECTIZER_WINDOWS="main dev logs" \
+    bash "$REPO_ROOT/scripts/new-project-session.sh" --dir "$project_dir"
+
+  if grep -Fq "send-keys" "$log_file"; then
+    printf 'FAIL: global tmux windows should not get startup commands\n' >&2
+    printf 'Log contents:\n' >&2
+    cat "$log_file" >&2
+    exit 1
+  fi
+}
+
 test_new_project_session_reuses_existing_session() {
   local stub_dir log_file project_dir
 
@@ -206,6 +259,8 @@ test_switch_session_uses_popup_and_switches() {
 
 run_test "sanitize session name" test_sanitize_session_name
 run_test "project config windows" test_new_project_session_uses_project_config_windows
+run_test "project config startup commands" test_new_project_session_runs_project_window_commands
+run_test "global windows stay plain" test_new_project_session_global_windows_do_not_run_commands
 run_test "reuse existing session" test_new_project_session_reuses_existing_session
 run_test "create session layout and windows" test_new_project_session_creates_windows_and_layout
 run_test "project config fallback defaults" test_new_project_session_without_project_config_uses_defaults

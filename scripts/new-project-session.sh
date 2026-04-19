@@ -126,6 +126,27 @@ parse_window_names() {
   fi
 }
 
+get_window_command() {
+  local window_name="$1"
+  local command_var_name
+
+  command_var_name="$(window_command_var_name "$window_name")"
+  printf '%s' "${!command_var_name-}"
+}
+
+run_window_startup_command() {
+  local target="$1"
+  local window_name="$2"
+  local command
+
+  command="$(get_window_command "$window_name")"
+  if [[ -z "$command" ]]; then
+    return 0
+  fi
+
+  tmux send-keys -t "$target" "$command" Enter
+}
+
 create_session() {
   local session_name="$1"
   local project_dir="$2"
@@ -152,11 +173,13 @@ create_session() {
   fi
   tmux select-layout -t "${session_name}:${first_window_index}" "$PROJECTIZER_LAYOUT"
   tmux select-pane -t "${session_name}:${first_window_index}.1"
+  run_window_startup_command "${session_name}:${first_window_index}.1" "${window_names[0]}"
 
   for ((i = 1; i < ${#window_names[@]}; i += 1)); do
     tmux new-window -t "$session_name" -n "${window_names[$i]}" -c "$project_dir"
     current_window_index="$(tmux display-message -p -t "$session_name" '#{window_index}')"
     created_windows+=("${session_name}:${current_window_index}")
+    run_window_startup_command "${session_name}:${current_window_index}.1" "${window_names[$i]}"
   done
 
   requested_initial_window="$PROJECTIZER_INITIAL_WINDOW"
@@ -227,6 +250,9 @@ while IFS= read -r config_line; do
       ;;
     PROJECTIZER_SEARCH_DEPTH)
       PROJECTIZER_SEARCH_DEPTH="${config_line#*=}"
+      ;;
+    PROJECTIZER_WINDOW_*_COMMAND)
+      printf -v "${config_line%%=*}" '%s' "${config_line#*=}"
       ;;
   esac
 done < <(load_project_config "$project_dir")

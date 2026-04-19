@@ -122,7 +122,9 @@ Supported YAML keys:
 | `initial_window` | `@projectizer-initial-window` |
 | `search_depth` | `@projectizer-search-depth` |
 
-The parser is intentionally simple and dependency-free. Use a flat structure with scalar values and a `windows` list made of consecutive `- name: ...` entries.
+The parser is intentionally simple and dependency-free. Use a flat structure with scalar values and a `windows` list made of consecutive `- name: ...` entries. Project-local windows can also define an optional `command:` that is sent to the window after it is created.
+
+Startup commands are only available in `.tmux-projectizer.yml`. The global `@projectizer-windows` tmux option stays a plain list of window names.
 
 Example:
 
@@ -130,7 +132,9 @@ Example:
 windows:
   - name: editor
   - name: server
+    command: npm run dev
   - name: logs
+    command: docker compose logs -f
 layout: main-vertical
 main_pane_width: 70%
 initial_window: 2
@@ -143,14 +147,17 @@ For example, a Next.js app might keep its project-local workflow alongside the c
 windows:
   - name: editor
   - name: dev
+    command: npm run dev
   - name: logs
+    command: docker compose logs -f
   - name: tests
+    command: npm test -- --watch
 layout: main-vertical
 main_pane_width: 72%
 initial_window: 2
 ```
 
-With that file in place, selecting `my-next-app` creates an `editor` workspace window, then dedicated `dev`, `logs`, and `tests` windows, regardless of the global defaults configured in your tmux config.
+With that file in place, selecting `my-next-app` creates an `editor` workspace window, then dedicated `dev`, `logs`, and `tests` windows, regardless of the global defaults configured in your tmux config. The `dev`, `logs`, and `tests` windows immediately start their configured commands after creation.
 
 ## How the picker behaves
 

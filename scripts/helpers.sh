@@ -24,6 +24,20 @@ strip_matching_quotes() {
   printf '%s' "$value"
 }
 
+window_command_var_name() {
+  local window_name="$1"
+  local normalized_name
+
+  normalized_name="$(printf '%s' "$window_name" | tr '[:lower:]' '[:upper:]')"
+  normalized_name="$(printf '%s' "$normalized_name" | sed -E 's/[^A-Z0-9]+/_/g; s/^_+//; s/_+$//; s/__+/_/g')"
+
+  if [[ -z "$normalized_name" ]]; then
+    normalized_name="WINDOW"
+  fi
+
+  printf 'PROJECTIZER_WINDOW_%s_COMMAND' "$normalized_name"
+}
+
 get_option() {
   local option_name="$1"
   local default_value="$2"
@@ -67,22 +81,33 @@ load_project_config() {
   local project_dir="$1"
   local config_path="${project_dir}/.tmux-projectizer.yml"
   local -a project_windows=()
+  local -a project_window_commands=()
   local line=""
+  local raw_line=""
   local trimmed_line=""
   local key=""
   local value=""
   local in_windows=0
+  local current_window_index=-1
+  local command_var_name=""
 
   if [[ ! -f "$config_path" ]]; then
     return 0
   fi
 
   while IFS= read -r line || [[ -n "$line" ]]; do
-    line="${line%%#*}"
-    trimmed_line="$(trim_whitespace "$line")"
+    raw_line="${line%%#*}"
+    trimmed_line="$(trim_whitespace "$raw_line")"
 
     if [[ -z "$trimmed_line" ]]; then
       continue
+    fi
+
+    if ((in_windows)); then
+      if [[ ! "$raw_line" =~ ^[[:space:]] ]]; then
+        in_windows=0
+        current_window_index=-1
+      fi
     fi
 
     if ((in_windows)); then
@@ -91,19 +116,30 @@ load_project_config() {
         value="$(strip_matching_quotes "$value")"
         if [[ -n "$value" ]]; then
           project_windows+=("$value")
+          project_window_commands+=("")
+          current_window_index=$((${#project_windows[@]} - 1))
         fi
         continue
       fi
 
-      if [[ "$trimmed_line" == -* ]]; then
+      if ((current_window_index >= 0)) &&
+        ([[ "$trimmed_line" == "command:"* ]] || [[ "$trimmed_line" == "- command:"* ]]); then
+        if [[ "$trimmed_line" == "- command:"* ]]; then
+          value="$(trim_whitespace "${trimmed_line#- command:}")"
+        else
+          value="$(trim_whitespace "${trimmed_line#command:}")"
+        fi
+        value="$(strip_matching_quotes "$value")"
+        project_window_commands[$current_window_index]="$value"
         continue
       fi
 
-      in_windows=0
+      continue
     fi
 
     if [[ "$trimmed_line" == windows: ]]; then
       in_windows=1
+      current_window_index=-1
       continue
     fi
 
@@ -137,5 +173,15 @@ load_project_config() {
 
   if ((${#project_windows[@]} > 0)); then
     printf 'PROJECTIZER_WINDOWS=%s\n' "${project_windows[*]}"
+
+    for current_window_index in "${!project_windows[@]}"; do
+      value="${project_window_commands[$current_window_index]}"
+      if [[ -z "$value" ]]; then
+        continue
+      fi
+
+      command_var_name="$(window_command_var_name "${project_windows[$current_window_index]}")"
+      printf '%s=%s\n' "$command_var_name" "$value"
+    done
   fi
 }

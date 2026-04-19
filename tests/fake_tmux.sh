@@ -199,7 +199,7 @@ case "$command_name" in
     fi
     exit "$popup_status"
     ;;
-  choose-tree|command-prompt|switch-client|rename-window|split-window|select-layout|select-pane|set-window-option|bind-key|set-option)
+  choose-tree|command-prompt|switch-client|rename-window|split-window|select-layout|select-pane|set-window-option|bind-key|set-option|send-keys)
     ;;
   *)
     printf 'Unsupported fake tmux command: %s\n' "$command_name" >&2
