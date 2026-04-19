@@ -7,6 +7,7 @@ DEFAULT_PROJECTIZER_PATHS="${HOME}/projects"
 DEFAULT_PROJECTIZER_SEARCH_DEPTH="2"
 DEFAULT_PROJECTIZER_NEW_SESSION_KEY="S"
 DEFAULT_PROJECTIZER_SWITCH_SESSION_KEY="f"
+DEFAULT_PROJECTIZER_KILL_SESSION_KEY="X"
 DEFAULT_PROJECTIZER_LAYOUT="main-vertical"
 DEFAULT_PROJECTIZER_MAIN_PANE_WIDTH="66%"
 DEFAULT_PROJECTIZER_WINDOWS="main bg logs"
@@ -67,6 +68,7 @@ set_default_option "@projectizer-paths" "$DEFAULT_PROJECTIZER_PATHS"
 set_default_option "@projectizer-search-depth" "$DEFAULT_PROJECTIZER_SEARCH_DEPTH"
 set_default_option "@projectizer-new-session-key" "$DEFAULT_PROJECTIZER_NEW_SESSION_KEY"
 set_default_option "@projectizer-switch-session-key" "$DEFAULT_PROJECTIZER_SWITCH_SESSION_KEY"
+set_default_option "@projectizer-kill-session-key" "$DEFAULT_PROJECTIZER_KILL_SESSION_KEY"
 set_default_option "@projectizer-layout" "$DEFAULT_PROJECTIZER_LAYOUT"
 set_default_option "@projectizer-main-pane-width" "$DEFAULT_PROJECTIZER_MAIN_PANE_WIDTH"
 set_default_option "@projectizer-windows" "$DEFAULT_PROJECTIZER_WINDOWS"
@@ -81,6 +83,7 @@ PROJECTIZER_PATHS="$(get_option_value "@projectizer-paths" "$DEFAULT_PROJECTIZER
 PROJECTIZER_SEARCH_DEPTH="$(get_option_value "@projectizer-search-depth" "$DEFAULT_PROJECTIZER_SEARCH_DEPTH")"
 PROJECTIZER_NEW_SESSION_KEY="$(get_option_value "@projectizer-new-session-key" "$DEFAULT_PROJECTIZER_NEW_SESSION_KEY")"
 PROJECTIZER_SWITCH_SESSION_KEY="$(get_option_value "@projectizer-switch-session-key" "$DEFAULT_PROJECTIZER_SWITCH_SESSION_KEY")"
+PROJECTIZER_KILL_SESSION_KEY="$(get_option_value "@projectizer-kill-session-key" "$DEFAULT_PROJECTIZER_KILL_SESSION_KEY")"
 PROJECTIZER_LAYOUT="$(get_option_value "@projectizer-layout" "$DEFAULT_PROJECTIZER_LAYOUT")"
 PROJECTIZER_MAIN_PANE_WIDTH="$(get_option_value "@projectizer-main-pane-width" "$DEFAULT_PROJECTIZER_MAIN_PANE_WIDTH")"
 PROJECTIZER_WINDOWS="$(get_option_value "@projectizer-windows" "$DEFAULT_PROJECTIZER_WINDOWS")"
@@ -111,8 +114,16 @@ SWITCH_SESSION_COMMAND="$(build_run_shell_command \
   "PROJECTIZER_HISTORY_SIZE" "$PROJECTIZER_HISTORY_SIZE" \
   "PROJECTIZER_HISTORY_FILE" "$PROJECTIZER_HISTORY_FILE")"
 
+KILL_SESSION_COMMAND="$(build_run_shell_command \
+  "${CURRENT_DIR}/scripts/kill-session.sh" \
+  "PROJECTIZER_FZF_HEIGHT" "$PROJECTIZER_FZF_HEIGHT" \
+  "PROJECTIZER_POPUP" "$PROJECTIZER_POPUP" \
+  "PROJECTIZER_HISTORY_SIZE" "$PROJECTIZER_HISTORY_SIZE" \
+  "PROJECTIZER_HISTORY_FILE" "$PROJECTIZER_HISTORY_FILE")"
+
 tmux bind-key "$PROJECTIZER_NEW_SESSION_KEY" run-shell "$NEW_SESSION_COMMAND" >/dev/null 2>&1 || true
 tmux bind-key "$PROJECTIZER_SWITCH_SESSION_KEY" run-shell "$SWITCH_SESSION_COMMAND" >/dev/null 2>&1 || true
+tmux bind-key "$PROJECTIZER_KILL_SESSION_KEY" run-shell "$KILL_SESSION_COMMAND" >/dev/null 2>&1 || true
 
 if [[ "$PROJECTIZER_QUICK_SWITCH" != "off" ]]; then
   for i in 1 2 3 4 5 6 7 8 9; do

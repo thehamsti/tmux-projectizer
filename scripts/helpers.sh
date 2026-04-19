@@ -105,6 +105,25 @@ read_recent_sessions() {
   awk 'NF && !seen[$0]++ { print }' "$history_file"
 }
 
+remove_from_recent_sessions() {
+  local session_name="$1"
+  local history_file
+  local temp_file
+
+  if [[ -z "$session_name" ]]; then
+    return 0
+  fi
+
+  history_file="$(get_history_file)"
+  if [[ ! -f "$history_file" ]]; then
+    return 0
+  fi
+
+  temp_file="$(mktemp "${history_file}.XXXXXX")"
+  awk -v current="$session_name" 'NF && $0 != current && !seen[$0]++ { print }' "$history_file" >"$temp_file"
+  mv "$temp_file" "$history_file"
+}
+
 record_recent_session() {
   local session_name="$1"
   local history_file
@@ -131,6 +150,47 @@ record_recent_session() {
   } | head -n "$history_size" >"$temp_file"
 
   mv "$temp_file" "$history_file"
+}
+
+write_ordered_sessions() {
+  local output_file="$1"
+  local exclude_session="${2:-}"
+  local session_file
+  local remaining_file
+  local ordered_file
+  local recent_session
+
+  session_file="$(mktemp -t tmux-projectizer-sessions-all.XXXXXX)"
+  remaining_file="$(mktemp -t tmux-projectizer-sessions-remaining.XXXXXX)"
+  ordered_file="$(mktemp -t tmux-projectizer-sessions-ordered.XXXXXX)"
+
+  tmux list-sessions -F "#S" | awk 'NF && !seen[$0]++ { print }' | sort >"$session_file"
+  : >"$output_file"
+
+  while IFS= read -r recent_session; do
+    [[ -n "$recent_session" ]] || continue
+    [[ -z "$exclude_session" || "$recent_session" != "$exclude_session" ]] || continue
+
+    if grep -Fxq "$recent_session" "$session_file"; then
+      printf '%s\n' "$recent_session" >>"$output_file"
+    fi
+  done < <(read_recent_sessions)
+
+  if [[ -n "$exclude_session" ]]; then
+    grep -Fxv "$exclude_session" "$session_file" >"$remaining_file" || true
+  else
+    cp "$session_file" "$remaining_file"
+  fi
+
+  if [[ -s "$output_file" ]]; then
+    cat "$output_file" >"$ordered_file"
+    grep -Fvx -f "$output_file" "$remaining_file" >>"$ordered_file" || true
+    mv "$ordered_file" "$output_file"
+  else
+    cat "$remaining_file" >"$output_file"
+  fi
+
+  rm -f "$session_file" "$remaining_file" "$ordered_file"
 }
 
 load_project_config() {

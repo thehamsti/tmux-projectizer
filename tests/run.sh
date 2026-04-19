@@ -391,6 +391,76 @@ EOF
   assert_contains "$log_file" "switch-client -t blog" "switch-session still switches to the selected session"
 }
 
+test_kill_session_removes_target_and_history() {
+  local stub_dir log_file history_file
+
+  stub_dir="$(new_stub_dir)"
+  prepare_path "$stub_dir"
+  log_file="${stub_dir}/commands.log"
+  history_file="${stub_dir}/projectizer-recent"
+  export TMUX_STUB_HAS_POPUP=1
+  export TMUX_STUB_CURRENT_SESSION="workspace"
+  export TMUX_STUB_POPUP_SELECTION="blog"
+  : >"${stub_dir}/session_workspace"
+  : >"${stub_dir}/session_blog"
+  : >"${stub_dir}/session_docs"
+  cat >"$history_file" <<'EOF'
+blog
+workspace
+docs
+EOF
+
+  bash "$REPO_ROOT/scripts/kill-session.sh"
+
+  if [[ -e "${stub_dir}/session_blog" ]]; then
+    printf 'FAIL: killed session should be removed from the tmux stub\n' >&2
+    exit 1
+  fi
+
+  assert_contains "$log_file" "kill-session -t blog" "kill-session calls tmux kill-session on the selected session"
+  assert_contains "$log_file" "display-message Killed session: blog" "kill-session confirms the killed session"
+  assert_eq "$(cat "$history_file")" $'workspace\ndocs' "kill-session removes the killed session from the recent history file"
+}
+
+test_kill_session_excludes_current_session_from_picker() {
+  local stub_dir capture_file history_file
+
+  stub_dir="$(new_stub_dir)"
+  prepare_path "$stub_dir"
+  capture_file="${stub_dir}/kill-picker-input"
+  history_file="${stub_dir}/projectizer-recent"
+  export TMUX_STUB_HAS_POPUP=1
+  export TMUX_STUB_CURRENT_SESSION="workspace"
+  export TMUX_STUB_POPUP_SELECTION="blog"
+  export TMUX_STUB_POPUP_CAPTURE_FILE="$capture_file"
+  : >"${stub_dir}/session_workspace"
+  : >"${stub_dir}/session_blog"
+  : >"${stub_dir}/session_docs"
+  cat >"$history_file" <<'EOF'
+workspace
+blog
+docs
+EOF
+
+  bash "$REPO_ROOT/scripts/kill-session.sh"
+
+  assert_eq "$(cat "$capture_file")" $'blog\ndocs' "kill-session omits the current session from the picker input while preserving recency"
+}
+
+test_kill_session_fallback_shows_message() {
+  local stub_dir log_file
+
+  stub_dir="$(new_stub_dir)"
+  prepare_path "$stub_dir"
+  log_file="${stub_dir}/commands.log"
+  export TMUX_STUB_HAS_POPUP=0
+
+  bash "$REPO_ROOT/scripts/kill-session.sh"
+
+  assert_contains "$log_file" "choose-tree -s" "kill-session falls back to choose-tree when popup selection is unavailable"
+  assert_contains "$log_file" "display-message projectizer kill-session requires popup + fzf; use tmux kill-session manually" "kill-session explains that fallback mode cannot delete sessions"
+}
+
 test_quick_switch_switches_to_requested_recent_session() {
   local stub_dir log_file history_file history_contents
 
@@ -474,6 +544,20 @@ test_tmux_entrypoint_skips_quick_switch_when_disabled() {
   unset TMUX_OPTION_PROJECTIZER_QUICK_SWITCH
 }
 
+test_tmux_entrypoint_binds_kill_session_key_by_default() {
+  local stub_dir log_file
+
+  stub_dir="$(new_stub_dir)"
+  prepare_path "$stub_dir"
+  log_file="${stub_dir}/commands.log"
+
+  bash "$REPO_ROOT/tmux-projectizer.tmux"
+
+  assert_contains "$log_file" "set-option -gq @projectizer-kill-session-key X" "entrypoint sets the default kill-session key"
+  assert_contains "$log_file" "bind-key X run-shell" "entrypoint binds the default kill-session key"
+  assert_contains "$log_file" "scripts/kill-session.sh" "kill-session binding targets the dedicated script"
+}
+
 run_test "sanitize session name" test_sanitize_session_name
 run_test "project config windows" test_new_project_session_uses_project_config_windows
 run_test "project config startup commands" test_new_project_session_runs_project_window_commands
@@ -489,10 +573,14 @@ run_test "recent session history reorder" test_record_recent_session_moves_exist
 run_test "recent session history max size" test_record_recent_session_respects_history_size
 run_test "recent session history dedupe" test_record_recent_session_removes_duplicates
 run_test "switch-session recency ordering" test_switch_session_orders_by_recency
+run_test "kill-session removes target and history" test_kill_session_removes_target_and_history
+run_test "kill-session excludes current session" test_kill_session_excludes_current_session_from_picker
+run_test "kill-session fallback" test_kill_session_fallback_shows_message
 run_test "quick-switch success" test_quick_switch_switches_to_requested_recent_session
 run_test "quick-switch out of range" test_quick_switch_out_of_range_shows_message
 run_test "quick-switch missing session" test_quick_switch_missing_session_shows_message
 run_test "entrypoint binds quick-switch keys" test_tmux_entrypoint_binds_quick_switch_keys_by_default
 run_test "entrypoint skips quick-switch keys when disabled" test_tmux_entrypoint_skips_quick_switch_when_disabled
+run_test "entrypoint binds kill-session key" test_tmux_entrypoint_binds_kill_session_key_by_default
 
 printf 'ok: %s tests\n' "$test_count"

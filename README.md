@@ -11,6 +11,7 @@ It is extracted from a custom local tmux setup, generalized into TPM conventions
 - Builds a repeatable first-window layout plus additional named windows.
 - Uses `fzf` inside a tmux popup when available.
 - Tracks recently-used sessions and promotes them to the top of the session switcher.
+- Opens a dedicated kill-session picker so you can remove old tmux sessions without leaving the keyboard.
 - Falls back cleanly when popups or `fzf` are unavailable.
 - Reads all behavior from tmux options, so it is easy to customize per machine.
 
@@ -60,11 +61,13 @@ tmux source-file ~/.tmux.conf
 
 - `@projectizer-new-session-key` opens the project picker and creates or reuses a session for the selected directory.
 - `@projectizer-switch-session-key` opens the session picker and switches to an existing tmux session.
+- `@projectizer-kill-session-key` opens the kill-session picker and deletes the selected tmux session.
 
 With the default bindings:
 
 - `prefix + S` opens the project picker.
 - `prefix + f` opens the session switcher.
+- `prefix + X` opens the kill-session picker.
 - `prefix + 1` through `prefix + 9` jump straight to the corresponding recent session.
 
 When a new session is created:
@@ -84,6 +87,7 @@ All options use tmux global options and can be set in `~/.tmux.conf`.
 | `@projectizer-search-depth` | `2` | Max depth for `find` when scanning project directories |
 | `@projectizer-new-session-key` | `S` | Key binding for new project session picker |
 | `@projectizer-switch-session-key` | `f` | Key binding for session switcher |
+| `@projectizer-kill-session-key` | `X` | Key binding for the kill-session picker |
 | `@projectizer-layout` | `"main-vertical"` | Layout for new sessions (`main-vertical`, `even-horizontal`, and other tmux layouts) |
 | `@projectizer-main-pane-width` | `"66%"` | Main pane width for `main-*` layouts |
 | `@projectizer-windows` | `"main bg logs"` | Space-separated window names to create |
@@ -105,6 +109,7 @@ set -g @projectizer-windows "main editor logs scratch"
 set -g @projectizer-initial-window 2
 set -g @projectizer-new-session-key "S"
 set -g @projectizer-switch-session-key "f"
+set -g @projectizer-kill-session-key "X"
 set -g @projectizer-history-size 75
 set -g @projectizer-history-file "$HOME/.tmux/projectizer-recent"
 set -g @projectizer-quick-switch "on"
@@ -216,6 +221,8 @@ With that file in place, selecting `my-next-app` creates an `editor` workspace w
 - `new-project-session` uses popup + `fzf` when tmux and `fzf` support it.
 - If popup support is unavailable, it falls back to `command-prompt` so you can type a directory path manually.
 - `switch-session` uses popup + `fzf` when possible, otherwise it falls back to tmux `choose-tree`.
+- `kill-session` uses the same popup + recent ordering as the switcher, but excludes the current session so you cannot delete the session you are standing in.
+- Without popup + `fzf`, `kill-session` falls back to `choose-tree` and shows a note that deletion is not available in fallback mode.
 - Canceling either picker exits cleanly without disrupting the current client.
 
 ## Similar plugins

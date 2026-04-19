@@ -53,17 +53,25 @@ if ! has_fzf || ! should_use_popup; then
     tmux display-message "projectizer popup mode requires tmux >= 3.2"
     exit 1
   fi
+
   tmux choose-tree -s
+  tmux display-message "projectizer kill-session requires popup + fzf; use tmux kill-session manually"
   exit 0
 fi
 
-selection_file="$(mktemp -t tmux-projectizer-sessions.XXXXXX)"
-sessions_file="$(mktemp -t tmux-projectizer-sessions-ordered.XXXXXX)"
+current_session="$(tmux display-message -p '#S' 2>/dev/null || true)"
+selection_file="$(mktemp -t tmux-projectizer-kill-session.XXXXXX)"
+sessions_file="$(mktemp -t tmux-projectizer-killable-sessions.XXXXXX)"
 register_temp_file "$selection_file"
 register_temp_file "$sessions_file"
-write_ordered_sessions "$sessions_file"
+write_ordered_sessions "$sessions_file" "$current_session"
 
-popup_command="bash -lc 'cat $(shell_quote "$sessions_file") | fzf --prompt=\"Session> \" --height=$(shell_quote "$PROJECTIZER_FZF_HEIGHT") > $(shell_quote "$selection_file")'"
+if [[ ! -s "$sessions_file" ]]; then
+  tmux display-message "projectizer: no other sessions to kill"
+  exit 0
+fi
+
+popup_command="bash -lc 'cat $(shell_quote "$sessions_file") | fzf --prompt=\"Kill session> \" --height=$(shell_quote "$PROJECTIZER_FZF_HEIGHT") > $(shell_quote "$selection_file")'"
 
 set +e
 tmux display-popup -E "$popup_command"
@@ -74,7 +82,7 @@ case "$popup_status" in
   0) ;;
   1|130) exit 130 ;;
   *)
-    tmux display-message "projectizer session picker failed (status ${popup_status})"
+    tmux display-message "projectizer kill-session picker failed (status ${popup_status})"
     exit "$popup_status"
     ;;
 esac
@@ -84,5 +92,6 @@ if [[ -z "$selected_session" ]]; then
   exit 1
 fi
 
-tmux switch-client -t "$selected_session"
-record_recent_session "$selected_session"
+tmux kill-session -t "$selected_session"
+remove_from_recent_sessions "$selected_session"
+tmux display-message "Killed session: $selected_session"

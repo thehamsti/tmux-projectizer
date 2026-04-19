@@ -98,7 +98,11 @@ case "$command_name" in
       esac
     done
     env_name="$(option_to_env "$option_name")"
-    printf '%s' "${!env_name-}"
+    if [[ -n "${!env_name-}" ]]; then
+      printf '%s' "${!env_name}"
+      exit 0
+    fi
+    exit 1
     ;;
   list-commands)
     if [[ "${TMUX_STUB_HAS_POPUP:-0}" == "1" ]]; then
@@ -197,12 +201,31 @@ case "$command_name" in
       esac
     done
     if ((format_mode)); then
-      session_name="$(parse_session_name "${target:-}")"
-      read_session_state "$session_name"
+      if [[ "$format" == '#S' ]]; then
+        printf '%s' "${TMUX_STUB_CURRENT_SESSION:-}"
+      else
+        session_name="$(parse_session_name "${target:-}")"
+        read_session_state "$session_name"
+      fi
       if [[ "$format" == "#{window_index}" ]]; then
         printf '%s' "$current_window"
       fi
     fi
+    ;;
+  kill-session)
+    while (($#)); do
+      case "$1" in
+        -t)
+          target="$2"
+          shift 2
+          ;;
+        *)
+          shift
+          ;;
+      esac
+    done
+    session_name="$(parse_session_name "${target:-}")"
+    rm -f "$(session_file "$session_name")"
     ;;
   display-popup)
     popup_command="${*: -1}"
