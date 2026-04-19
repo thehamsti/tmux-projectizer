@@ -14,7 +14,7 @@ option_to_env() {
   local option_name="$1"
   option_name="${option_name#@}"
   option_name="${option_name//-/_}"
-  option_name="${option_name^^}"
+  option_name="$(printf '%s' "$option_name" | tr '[:lower:]' '[:upper:]')"
   printf 'TMUX_OPTION_%s' "$option_name"
 }
 
@@ -82,7 +82,21 @@ log_command "${command_name} $*"
 
 case "$command_name" in
   show-option)
-    option_name="${*: -1}"
+    option_name=""
+    while (($#)); do
+      case "$1" in
+        -g|-v|-q|-s|-w|-p)
+          shift
+          ;;
+        -*)
+          shift
+          ;;
+        *)
+          option_name="$1"
+          shift
+          ;;
+      esac
+    done
     env_name="$(option_to_env "$option_name")"
     printf '%s' "${!env_name-}"
     ;;

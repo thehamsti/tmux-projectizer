@@ -31,6 +31,19 @@ assert_contains() {
   fi
 }
 
+assert_not_contains() {
+  local file_path="$1"
+  local unexpected="$2"
+  local message="$3"
+
+  if grep -Fq "$unexpected" "$file_path"; then
+    printf 'FAIL: %s\nUnexpected: %s\n' "$message" "$unexpected" >&2
+    printf 'Log contents:\n' >&2
+    cat "$file_path" >&2
+    exit 1
+  fi
+}
+
 run_test() {
   local name="$1"
   shift
@@ -378,6 +391,89 @@ EOF
   assert_contains "$log_file" "switch-client -t blog" "switch-session still switches to the selected session"
 }
 
+test_quick_switch_switches_to_requested_recent_session() {
+  local stub_dir log_file history_file history_contents
+
+  stub_dir="$(new_stub_dir)"
+  prepare_path "$stub_dir"
+  log_file="${stub_dir}/commands.log"
+  history_file="${stub_dir}/projectizer-recent"
+  : >"${stub_dir}/session_workspace"
+  : >"${stub_dir}/session_blog"
+  cat >"$history_file" <<'EOF'
+workspace
+blog
+EOF
+
+  bash "$REPO_ROOT/scripts/quick-switch.sh" 1
+
+  assert_contains "$log_file" "switch-client -t workspace" "quick-switch activates the requested recent session"
+  history_contents="$(cat "$history_file")"
+  assert_eq "$history_contents" $'workspace\nblog' "quick-switch refreshes recency after a successful switch"
+}
+
+test_quick_switch_out_of_range_shows_message() {
+  local stub_dir log_file history_file
+
+  stub_dir="$(new_stub_dir)"
+  prepare_path "$stub_dir"
+  log_file="${stub_dir}/commands.log"
+  history_file="${stub_dir}/projectizer-recent"
+  cat >"$history_file" <<'EOF'
+workspace
+EOF
+
+  bash "$REPO_ROOT/scripts/quick-switch.sh" 2
+
+  assert_contains "$log_file" "display-message projectizer: no session at position 2" "quick-switch reports missing history positions"
+  assert_not_contains "$log_file" "switch-client -t" "quick-switch does not switch when the requested position is missing"
+}
+
+test_quick_switch_missing_session_shows_message() {
+  local stub_dir log_file history_file
+
+  stub_dir="$(new_stub_dir)"
+  prepare_path "$stub_dir"
+  log_file="${stub_dir}/commands.log"
+  history_file="${stub_dir}/projectizer-recent"
+  cat >"$history_file" <<'EOF'
+workspace
+EOF
+
+  bash "$REPO_ROOT/scripts/quick-switch.sh" 1
+
+  assert_contains "$log_file" "display-message projectizer: session 'workspace' no longer exists" "quick-switch reports stale history entries"
+  assert_not_contains "$log_file" "switch-client -t" "quick-switch does not switch to missing sessions"
+}
+
+test_tmux_entrypoint_binds_quick_switch_keys_by_default() {
+  local stub_dir log_file
+
+  stub_dir="$(new_stub_dir)"
+  prepare_path "$stub_dir"
+  log_file="${stub_dir}/commands.log"
+
+  bash "$REPO_ROOT/tmux-projectizer.tmux"
+
+  assert_contains "$log_file" "bind-key 1 run-shell" "quick-switch binds prefix plus 1 by default"
+  assert_contains "$log_file" "bind-key 9 run-shell" "quick-switch binds prefix plus 9 by default"
+  assert_contains "$log_file" "scripts/quick-switch.sh 1" "quick-switch binding targets the dedicated script"
+}
+
+test_tmux_entrypoint_skips_quick_switch_when_disabled() {
+  local stub_dir log_file
+
+  stub_dir="$(new_stub_dir)"
+  prepare_path "$stub_dir"
+  log_file="${stub_dir}/commands.log"
+  export TMUX_OPTION_PROJECTIZER_QUICK_SWITCH="off"
+
+  bash "$REPO_ROOT/tmux-projectizer.tmux"
+
+  assert_not_contains "$log_file" "scripts/quick-switch.sh 1" "quick-switch bindings are skipped when disabled"
+  unset TMUX_OPTION_PROJECTIZER_QUICK_SWITCH
+}
+
 run_test "sanitize session name" test_sanitize_session_name
 run_test "project config windows" test_new_project_session_uses_project_config_windows
 run_test "project config startup commands" test_new_project_session_runs_project_window_commands
@@ -393,5 +489,10 @@ run_test "recent session history reorder" test_record_recent_session_moves_exist
 run_test "recent session history max size" test_record_recent_session_respects_history_size
 run_test "recent session history dedupe" test_record_recent_session_removes_duplicates
 run_test "switch-session recency ordering" test_switch_session_orders_by_recency
+run_test "quick-switch success" test_quick_switch_switches_to_requested_recent_session
+run_test "quick-switch out of range" test_quick_switch_out_of_range_shows_message
+run_test "quick-switch missing session" test_quick_switch_missing_session_shows_message
+run_test "entrypoint binds quick-switch keys" test_tmux_entrypoint_binds_quick_switch_keys_by_default
+run_test "entrypoint skips quick-switch keys when disabled" test_tmux_entrypoint_skips_quick_switch_when_disabled
 
 printf 'ok: %s tests\n' "$test_count"

@@ -65,6 +65,7 @@ With the default bindings:
 
 - `prefix + S` opens the project picker.
 - `prefix + f` opens the session switcher.
+- `prefix + 1` through `prefix + 9` jump straight to the corresponding recent session.
 
 When a new session is created:
 
@@ -91,6 +92,7 @@ All options use tmux global options and can be set in `~/.tmux.conf`.
 | `@projectizer-popup` | `"auto"` | `"auto"` uses popup when available, `"always"` requires popup, `"never"` disables popup fallbacks |
 | `@projectizer-history-size` | `50` | Max number of recent sessions to keep in the history file |
 | `@projectizer-history-file` | `"$HOME/.tmux/projectizer-recent"` | File that stores recent sessions, one session name per line |
+| `@projectizer-quick-switch` | `"on"` | `"on"` binds `prefix + 1` through `prefix + 9` to recent sessions, `"off"` leaves number keys alone |
 
 Example configuration:
 
@@ -105,6 +107,7 @@ set -g @projectizer-new-session-key "S"
 set -g @projectizer-switch-session-key "f"
 set -g @projectizer-history-size 75
 set -g @projectizer-history-file "$HOME/.tmux/projectizer-recent"
+set -g @projectizer-quick-switch "on"
 ```
 
 ## Recent Sessions
@@ -132,6 +135,24 @@ my-app
 - Truncated to `@projectizer-history-size`
 
 When you open the session switcher with `prefix + f`, tmux-projectizer reads that file and orders the picker with recent sessions first, followed by the rest of your sessions alphabetically. That gives the switcher an alt-tab-like feel where your current working set stays at the top.
+
+## Quick Switch
+
+`prefix + 1` through `prefix + 9` provide direct "Nth most recent session" switching without opening the picker:
+
+- `prefix + 1` switches to the most recent session
+- `prefix + 2` switches to the second most recent session
+- and so on through `prefix + 9`
+
+Quick switch reads the same recent-session history file used by the session picker. If a slot is empty or points to a session that no longer exists, tmux-projectizer shows a short message instead of failing.
+
+You can disable the bindings entirely:
+
+```tmux
+set -g @projectizer-quick-switch "off"
+```
+
+Tradeoff: tmux uses `prefix + 0-9` for window-by-index selection by default. When quick switch is on, tmux-projectizer replaces `prefix + 1` through `prefix + 9` with recent-session switching. If you prefer the default tmux window bindings, set `@projectizer-quick-switch` to `"off"`.
 
 ## Per-Project Configuration
 

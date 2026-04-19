@@ -15,6 +15,7 @@ DEFAULT_PROJECTIZER_FZF_HEIGHT="40%"
 DEFAULT_PROJECTIZER_POPUP="auto"
 DEFAULT_PROJECTIZER_HISTORY_SIZE="50"
 DEFAULT_PROJECTIZER_HISTORY_FILE="${HOME}/.tmux/projectizer-recent"
+DEFAULT_PROJECTIZER_QUICK_SWITCH="on"
 
 set_default_option() {
   local option_name="$1"
@@ -74,6 +75,7 @@ set_default_option "@projectizer-fzf-height" "$DEFAULT_PROJECTIZER_FZF_HEIGHT"
 set_default_option "@projectizer-popup" "$DEFAULT_PROJECTIZER_POPUP"
 set_default_option "@projectizer-history-size" "$DEFAULT_PROJECTIZER_HISTORY_SIZE"
 set_default_option "@projectizer-history-file" "$DEFAULT_PROJECTIZER_HISTORY_FILE"
+set_default_option "@projectizer-quick-switch" "$DEFAULT_PROJECTIZER_QUICK_SWITCH"
 
 PROJECTIZER_PATHS="$(get_option_value "@projectizer-paths" "$DEFAULT_PROJECTIZER_PATHS")"
 PROJECTIZER_SEARCH_DEPTH="$(get_option_value "@projectizer-search-depth" "$DEFAULT_PROJECTIZER_SEARCH_DEPTH")"
@@ -87,6 +89,7 @@ PROJECTIZER_FZF_HEIGHT="$(get_option_value "@projectizer-fzf-height" "$DEFAULT_P
 PROJECTIZER_POPUP="$(get_option_value "@projectizer-popup" "$DEFAULT_PROJECTIZER_POPUP")"
 PROJECTIZER_HISTORY_SIZE="$(get_option_value "@projectizer-history-size" "$DEFAULT_PROJECTIZER_HISTORY_SIZE")"
 PROJECTIZER_HISTORY_FILE="$(get_option_value "@projectizer-history-file" "$DEFAULT_PROJECTIZER_HISTORY_FILE")"
+PROJECTIZER_QUICK_SWITCH="$(get_option_value "@projectizer-quick-switch" "$DEFAULT_PROJECTIZER_QUICK_SWITCH")"
 
 NEW_SESSION_COMMAND="$(build_run_shell_command \
   "${CURRENT_DIR}/scripts/new-project-session.sh" \
@@ -110,3 +113,9 @@ SWITCH_SESSION_COMMAND="$(build_run_shell_command \
 
 tmux bind-key "$PROJECTIZER_NEW_SESSION_KEY" run-shell "$NEW_SESSION_COMMAND" >/dev/null 2>&1 || true
 tmux bind-key "$PROJECTIZER_SWITCH_SESSION_KEY" run-shell "$SWITCH_SESSION_COMMAND" >/dev/null 2>&1 || true
+
+if [[ "$PROJECTIZER_QUICK_SWITCH" != "off" ]]; then
+  for i in 1 2 3 4 5 6 7 8 9; do
+    tmux bind-key "$i" run-shell "${CURRENT_DIR}/scripts/quick-switch.sh $i" >/dev/null 2>&1 || true
+  done
+fi
