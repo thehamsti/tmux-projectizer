@@ -66,6 +66,16 @@ parse_window_index() {
   printf '1'
 }
 
+extract_popup_source() {
+  local popup_command="$1"
+  local popup_source
+
+  popup_source="$(printf '%s' "$popup_command" | sed -nE "s/.*cat ([^|]+) \\| fzf.*/\\1/p")"
+  popup_source="${popup_source#\'}"
+  popup_source="${popup_source%\'}"
+  printf '%s' "$popup_source"
+}
+
 command_name="${1:-}"
 shift || true
 log_command "${command_name} $*"
@@ -192,6 +202,12 @@ case "$command_name" in
         redirect_target="${popup_command##*> }"
         redirect_target="${redirect_target%\'}"
         redirect_target="${redirect_target#\'}"
+        if [[ -n "${TMUX_STUB_POPUP_CAPTURE_FILE:-}" ]]; then
+          popup_source="$(extract_popup_source "$popup_command")"
+          if [[ -n "$popup_source" && -f "$popup_source" ]]; then
+            cat "$popup_source" >"$TMUX_STUB_POPUP_CAPTURE_FILE"
+          fi
+        fi
         printf '%s\n' "$TMUX_STUB_POPUP_SELECTION" >"$redirect_target"
       else
         eval "$popup_command"

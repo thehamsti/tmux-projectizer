@@ -51,6 +51,8 @@ prepare_path() {
   ln -sf "$REPO_ROOT/tests/fake_tmux.sh" "$stub_dir/tmux"
   PATH="$stub_dir:$REPO_ROOT/tests:$PATH"
   export TMUX_STUB_DIR="$stub_dir"
+  export PROJECTIZER_HISTORY_FILE="$stub_dir/projectizer-recent"
+  export PROJECTIZER_HISTORY_SIZE="50"
   export PATH
   unset TMUX_STUB_HAS_POPUP TMUX_STUB_POPUP_SELECTION TMUX_STUB_POPUP_STATUS FZF_STUB_SELECTION FZF_STUB_EXIT_STATUS
 }
@@ -257,6 +259,125 @@ test_switch_session_uses_popup_and_switches() {
   assert_contains "$log_file" "switch-client -t workspace" "selected session becomes active"
 }
 
+test_record_recent_session_creates_history_file() {
+  local history_dir history_file history_contents
+
+  history_dir="$TEST_ROOT/history-create"
+  history_file="$history_dir/recent"
+
+  PROJECTIZER_HISTORY_FILE="$history_file" \
+    PROJECTIZER_HISTORY_SIZE="5" \
+    bash -lc '
+      source "'"$REPO_ROOT"'/scripts/helpers.sh"
+      record_recent_session "workspace"
+    '
+
+  history_contents="$(cat "$history_file")"
+  assert_eq "$history_contents" "workspace" "record_recent_session creates a new history file"
+}
+
+test_record_recent_session_moves_existing_session_to_top() {
+  local history_dir history_file history_contents
+
+  history_dir="$TEST_ROOT/history-move"
+  history_file="$history_dir/recent"
+  mkdir -p "$history_dir"
+  cat >"$history_file" <<'EOF'
+blog
+workspace
+notes
+EOF
+
+  PROJECTIZER_HISTORY_FILE="$history_file" \
+    PROJECTIZER_HISTORY_SIZE="5" \
+    bash -lc '
+      source "'"$REPO_ROOT"'/scripts/helpers.sh"
+      record_recent_session "workspace"
+    '
+
+  history_contents="$(cat "$history_file")"
+  assert_eq "$history_contents" $'workspace\nblog\nnotes' "record_recent_session moves existing sessions to the top"
+}
+
+test_record_recent_session_respects_history_size() {
+  local history_dir history_file history_contents
+
+  history_dir="$TEST_ROOT/history-size"
+  history_file="$history_dir/recent"
+  mkdir -p "$history_dir"
+  cat >"$history_file" <<'EOF'
+blog
+notes
+infra
+docs
+EOF
+
+  PROJECTIZER_HISTORY_FILE="$history_file" \
+    PROJECTIZER_HISTORY_SIZE="3" \
+    bash -lc '
+      source "'"$REPO_ROOT"'/scripts/helpers.sh"
+      record_recent_session "workspace"
+    '
+
+  history_contents="$(cat "$history_file")"
+  assert_eq "$history_contents" $'workspace\nblog\nnotes' "record_recent_session truncates the history list to the configured size"
+}
+
+test_record_recent_session_removes_duplicates() {
+  local history_dir history_file history_contents
+
+  history_dir="$TEST_ROOT/history-dedup"
+  history_file="$history_dir/recent"
+  mkdir -p "$history_dir"
+  cat >"$history_file" <<'EOF'
+blog
+workspace
+notes
+workspace
+blog
+EOF
+
+  PROJECTIZER_HISTORY_FILE="$history_file" \
+    PROJECTIZER_HISTORY_SIZE="10" \
+    bash -lc '
+      source "'"$REPO_ROOT"'/scripts/helpers.sh"
+      record_recent_session "workspace"
+    '
+
+  history_contents="$(cat "$history_file")"
+  assert_eq "$history_contents" $'workspace\nblog\nnotes' "record_recent_session removes duplicate entries"
+}
+
+test_switch_session_orders_by_recency() {
+  local stub_dir log_file history_dir history_file capture_file
+
+  stub_dir="$(new_stub_dir)"
+  prepare_path "$stub_dir"
+  log_file="${stub_dir}/commands.log"
+  history_dir="$TEST_ROOT/history-switch-order"
+  history_file="$history_dir/recent"
+  capture_file="$history_dir/fzf-input"
+  mkdir -p "$history_dir"
+  export TMUX_STUB_HAS_POPUP=1
+  export TMUX_STUB_POPUP_SELECTION="blog"
+  export TMUX_STUB_POPUP_CAPTURE_FILE="$capture_file"
+  : > "${stub_dir}/session_blog"
+  : > "${stub_dir}/session_docs"
+  : > "${stub_dir}/session_workspace"
+  cat >"$history_file" <<'EOF'
+workspace
+blog
+unknown
+EOF
+
+  PROJECTIZER_HISTORY_FILE="$history_file" \
+    PROJECTIZER_HISTORY_SIZE="10" \
+    bash "$REPO_ROOT/scripts/switch-session.sh"
+
+  assert_eq "$(cat "$capture_file")" $'workspace\nblog\ndocs' "switch-session sorts sessions by recency before fzf"
+  assert_contains "$log_file" "switch-client -t blog" "switch-session still switches to the selected session"
+}
+
 run_test "sanitize session name" test_sanitize_session_name
 run_test "project config windows" test_new_project_session_uses_project_config_windows
 run_test "project config startup commands" test_new_project_session_runs_project_window_commands
@@ -267,5 +388,10 @@ run_test "project config fallback defaults" test_new_project_session_without_pro
 run_test "project config layout override" test_new_project_session_project_config_overrides_layout_and_width
 run_test "switch-session fallback" test_switch_session_uses_choose_tree_without_popup
 run_test "switch-session popup flow" test_switch_session_uses_popup_and_switches
+run_test "recent session history file creation" test_record_recent_session_creates_history_file
+run_test "recent session history reorder" test_record_recent_session_moves_existing_session_to_top
+run_test "recent session history max size" test_record_recent_session_respects_history_size
+run_test "recent session history dedupe" test_record_recent_session_removes_duplicates
+run_test "switch-session recency ordering" test_switch_session_orders_by_recency
 
 printf 'ok: %s tests\n' "$test_count"

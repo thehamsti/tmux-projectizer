@@ -52,6 +52,23 @@ get_option() {
   printf '%s' "$default_value"
 }
 
+get_history_file() {
+  printf '%s' "${PROJECTIZER_HISTORY_FILE:-$(get_option "@projectizer-history-file" "$HOME/.tmux/projectizer-recent")}"
+}
+
+get_history_size() {
+  local history_size
+
+  history_size="${PROJECTIZER_HISTORY_SIZE:-$(get_option "@projectizer-history-size" "50")}"
+  history_size="${history_size//[^0-9]/}"
+
+  if [[ -z "$history_size" ]]; then
+    history_size="50"
+  fi
+
+  printf '%s' "$history_size"
+}
+
 sanitize_session_name() {
   local raw_name="$1"
   local session_name
@@ -75,6 +92,45 @@ has_popup() {
 
 has_fzf() {
   command -v fzf >/dev/null 2>&1
+}
+
+read_recent_sessions() {
+  local history_file
+
+  history_file="$(get_history_file)"
+  if [[ ! -f "$history_file" ]]; then
+    return 0
+  fi
+
+  awk 'NF && !seen[$0]++ { print }' "$history_file"
+}
+
+record_recent_session() {
+  local session_name="$1"
+  local history_file
+  local history_dir
+  local history_size
+  local temp_file
+
+  if [[ -z "$session_name" ]]; then
+    return 0
+  fi
+
+  history_file="$(get_history_file)"
+  history_size="$(get_history_size)"
+  history_dir="$(dirname "$history_file")"
+
+  mkdir -p "$history_dir"
+  temp_file="$(mktemp "${history_file}.XXXXXX")"
+
+  {
+    printf '%s\n' "$session_name"
+    if [[ -f "$history_file" ]]; then
+      awk -v current="$session_name" 'NF && $0 != current && !seen[$0]++ { print }' "$history_file"
+    fi
+  } | head -n "$history_size" >"$temp_file"
+
+  mv "$temp_file" "$history_file"
 }
 
 load_project_config() {
@@ -122,15 +178,15 @@ load_project_config() {
         continue
       fi
 
-      if ((current_window_index >= 0)) &&
-        ([[ "$trimmed_line" == "command:"* ]] || [[ "$trimmed_line" == "- command:"* ]]); then
+      if ((current_window_index >= 0 )) &&
+        { [[ "$trimmed_line" == "command:"* ]] || [[ "$trimmed_line" == "- command:"* ]]; }; then
         if [[ "$trimmed_line" == "- command:"* ]]; then
           value="$(trim_whitespace "${trimmed_line#- command:}")"
         else
           value="$(trim_whitespace "${trimmed_line#command:}")"
         fi
         value="$(strip_matching_quotes "$value")"
-        project_window_commands[$current_window_index]="$value"
+        project_window_commands[current_window_index]="$value"
         continue
       fi
 

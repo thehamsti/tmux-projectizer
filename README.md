@@ -10,6 +10,7 @@ It is extracted from a custom local tmux setup, generalized into TPM conventions
 - Creates project sessions on demand, or switches to an existing matching session.
 - Builds a repeatable first-window layout plus additional named windows.
 - Uses `fzf` inside a tmux popup when available.
+- Tracks recently-used sessions and promotes them to the top of the session switcher.
 - Falls back cleanly when popups or `fzf` are unavailable.
 - Reads all behavior from tmux options, so it is easy to customize per machine.
 
@@ -88,6 +89,8 @@ All options use tmux global options and can be set in `~/.tmux.conf`.
 | `@projectizer-initial-window` | `1` | 1-based ordinal of the created window to select after creation |
 | `@projectizer-fzf-height` | `"40%"` | Height for the `fzf` popup |
 | `@projectizer-popup` | `"auto"` | `"auto"` uses popup when available, `"always"` requires popup, `"never"` disables popup fallbacks |
+| `@projectizer-history-size` | `50` | Max number of recent sessions to keep in the history file |
+| `@projectizer-history-file` | `"$HOME/.tmux/projectizer-recent"` | File that stores recent sessions, one session name per line |
 
 Example configuration:
 
@@ -100,7 +103,35 @@ set -g @projectizer-windows "main editor logs scratch"
 set -g @projectizer-initial-window 2
 set -g @projectizer-new-session-key "S"
 set -g @projectizer-switch-session-key "f"
+set -g @projectizer-history-size 75
+set -g @projectizer-history-file "$HOME/.tmux/projectizer-recent"
 ```
+
+## Recent Sessions
+
+Every time `tmux-projectizer` creates a session, reuses one from the project picker, or switches to one from the session switcher, it records that session in a recent-history file.
+
+The default history file is:
+
+```bash
+$HOME/.tmux/projectizer-recent
+```
+
+The file format is intentionally simple:
+
+```text
+hamsti-lms
+aisdk-template-nextjs
+blog
+my-app
+```
+
+- One session name per line
+- Most recent session first
+- Automatically deduplicated
+- Truncated to `@projectizer-history-size`
+
+When you open the session switcher with `prefix + f`, tmux-projectizer reads that file and orders the picker with recent sessions first, followed by the rest of your sessions alphabetically. That gives the switcher an alt-tab-like feel where your current working set stays at the top.
 
 ## Per-Project Configuration
 

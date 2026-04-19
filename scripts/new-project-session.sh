@@ -192,6 +192,7 @@ create_session() {
 
   tmux select-window -t "$window_target"
   tmux switch-client -t "$session_name"
+  record_recent_session "$session_name"
 }
 
 project_dir=""
@@ -265,6 +266,7 @@ fi
 session_name="$(sanitize_session_name "$(basename "$project_dir")")"
 if tmux has-session -t "$session_name" 2>/dev/null; then
   tmux switch-client -t "$session_name"
+  record_recent_session "$session_name"
   exit 0
 fi
 

@@ -1,6 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+if [[ -n "${FZF_STUB_CAPTURE:-}" ]]; then
+  cat >"$FZF_STUB_CAPTURE"
+else
+  cat >/dev/null
+fi
+
 if [[ -n "${FZF_STUB_SELECTION:-}" ]]; then
   printf '%s\n' "$FZF_STUB_SELECTION"
   exit 0
