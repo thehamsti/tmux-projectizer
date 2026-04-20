@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -uo pipefail
 
+PROJECTIZER_VERSION="0.1.0"
+
 CURRENT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 DEFAULT_PROJECTIZER_PATHS="${HOME}/projects"

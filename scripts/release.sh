@@ -186,7 +186,7 @@ main() {
 
   # ── update version in source ───────────────────────────
 
-  sed -i'' "s/PROJECTIZER_VERSION=\"${current_version}\"/PROJECTIZER_VERSION=\"${new_version}\"/" "$VERSION_FILE"
+  sed -i '' "s/PROJECTIZER_VERSION=\"${current_version}\"/PROJECTIZER_VERSION=\"${new_version}\"/" "$VERSION_FILE"
 
   info "Updated PROJECTIZER_VERSION in $(basename "$VERSION_FILE")"
 
